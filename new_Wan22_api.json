@@ -230,7 +230,7 @@
   },
   "279": {
     "inputs": {
-      "lora_0": "high_noise_model.safetensors",
+      "lora_0": "none",
       "strength_0": 1,
       "lora_1": "none",
       "strength_1": 1,
@@ -400,7 +400,7 @@
   },
   "553": {
     "inputs": {
-      "lora_0": "low_noise_model.safetensors",
+      "lora_0": "none",
       "strength_0": 1,
       "lora_1": "none",
       "strength_1": 1,

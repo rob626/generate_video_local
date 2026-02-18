@@ -480,14 +480,14 @@ def handler(job_input):
                         lora_low = download_model(lora_pair["low_url"], "loras", lora_low)
 
                     if lora_high:
-                        prompt[high_lora_node_id]["inputs"][f"lora_{i+1}"] = lora_high
-                        prompt[high_lora_node_id]["inputs"][f"strength_{i+1}"] = lora_high_weight
-                        logger.info(f"LoRA {i+1} HIGH applied to node 279: {lora_high} with weight {lora_high_weight}")
+                        prompt[high_lora_node_id]["inputs"][f"lora_{i}"] = lora_high
+                        prompt[high_lora_node_id]["inputs"][f"strength_{i}"] = lora_high_weight
+                        logger.info(f"LoRA {i} HIGH applied to node 279: {lora_high} with weight {lora_high_weight}")
 
                     if lora_low:
-                        prompt[low_lora_node_id]["inputs"][f"lora_{i+1}"] = lora_low
-                        prompt[low_lora_node_id]["inputs"][f"strength_{i+1}"] = lora_low_weight
-                        logger.info(f"LoRA {i+1} LOW applied to node 553: {lora_low} with weight {lora_low_weight}")
+                        prompt[low_lora_node_id]["inputs"][f"lora_{i}"] = lora_low
+                        prompt[low_lora_node_id]["inputs"][f"strength_{i}"] = lora_low_weight
+                        logger.info(f"LoRA {i} LOW applied to node 553: {lora_low} with weight {lora_low_weight}")
 
         ws_url = f"ws://{server_address}:8188/ws?clientId={client_id}"
         logger.info(f"Connecting to WebSocket: {ws_url}")
