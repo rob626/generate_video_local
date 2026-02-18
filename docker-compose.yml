@@ -1,0 +1,14 @@
+services:
+  video-generator:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./models:/runpod-volume
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
