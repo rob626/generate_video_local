@@ -40,7 +40,8 @@ class GenerateRequest(BaseModel):
     height: int = 832
     length: int = Field(default=81, description="Number of frames")
     steps: int = 10
-    context_overlap: int = 48
+    context_overlap: int = 24
+    context_frames: int = 81
     # Model overrides (filename on volume, or _url to download on-demand)
     diffusion_model_high: Optional[str] = None
     diffusion_model_high_url: Optional[str] = None

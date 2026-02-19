@@ -449,8 +449,8 @@ def handler(job_input, progress_callback=None):
             logger.info(f"Height adjusted to nearest multiple of 16: {original_height} -> {adjusted_height}")
         prompt["235"]["inputs"]["value"] = adjusted_width
         prompt["236"]["inputs"]["value"] = adjusted_height
-        prompt["498"]["inputs"]["context_overlap"] = job_input.get("context_overlap", 48)
-        prompt["498"]["inputs"]["context_frames"] = length
+        prompt["498"]["inputs"]["context_overlap"] = job_input.get("context_overlap", 24)
+        prompt["498"]["inputs"]["context_frames"] = job_input.get("context_frames", 81)
 
         # Apply step settings
         if "834" in prompt:
