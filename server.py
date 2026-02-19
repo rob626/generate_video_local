@@ -5,9 +5,9 @@ import threading
 import urllib.request
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 
-from handler import handler
+from handler import handler, handler_v2
 
 logging.basicConfig(
     level=logging.INFO,
@@ -57,6 +57,21 @@ class GenerateRequest(BaseModel):
     lora_pairs: Optional[list] = None
 
 
+class ModelDownload(BaseModel):
+    url: str
+    model_type: str
+    filename: Optional[str] = None
+
+
+class GenerateV2Request(BaseModel):
+    workflow: dict
+    image_base64: str
+    image_node_id: str = "244"
+    end_image_base64: Optional[str] = None
+    end_image_node_id: str = "617"
+    model_downloads: Optional[List[ModelDownload]] = None
+
+
 class JobStatusResponse(BaseModel):
     job_id: str
     status: str
@@ -70,7 +85,7 @@ class JobStatusResponse(BaseModel):
     current_node: Optional[str] = None
 
 
-def run_job(job_id: str, job_input: dict):
+def run_job(job_id: str, job_input: dict, handler_fn=handler):
     """Run video generation in a background thread."""
     with jobs_lock:
         jobs[job_id]["status"] = "running"
@@ -86,7 +101,7 @@ def run_job(job_id: str, job_input: dict):
     logger.info(f"Starting generation for job {job_id}")
 
     try:
-        result = handler(job_input, progress_callback=on_progress)
+        result = handler_fn(job_input, progress_callback=on_progress)
         with jobs_lock:
             if "error" in result:
                 jobs[job_id]["status"] = "failed"
@@ -124,6 +139,32 @@ def generate(request: GenerateRequest):
         }
 
     thread = threading.Thread(target=run_job, args=(job_id, job_input), daemon=True)
+    thread.start()
+
+    return {"job_id": job_id}
+
+
+@app.post("/generate/v2")
+def generate_v2(request: GenerateV2Request):
+    job_id = str(uuid.uuid4())
+    job_input = request.model_dump(exclude_none=True)
+    job_input["job_id"] = job_id
+
+    with jobs_lock:
+        jobs[job_id] = {
+            "job_id": job_id,
+            "status": "pending",
+            "result": None,
+            "created_at": time.time(),
+            "started_at": None,
+            "completed_at": None,
+            "progress": None,
+            "progress_step": None,
+            "progress_max": None,
+            "current_node": None,
+        }
+
+    thread = threading.Thread(target=run_job, args=(job_id, job_input, handler_v2), daemon=True)
     thread.start()
 
     return {"job_id": job_id}

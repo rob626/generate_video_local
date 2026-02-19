@@ -551,3 +551,85 @@ def handler(job_input, progress_callback=None):
     except Exception as e:
         logger.error(f"=== Job {job_id} failed === {type(e).__name__}: {e}\n{traceback.format_exc()}")
         return {"error": f"Job failed: {type(e).__name__}: {str(e)}"}
+
+
+def handler_v2(job_input, progress_callback=None):
+    """Process a v2 video generation job. Accepts a pre-built workflow from the client.
+    Only handles: image file I/O, model downloads, ComfyUI submission, and result retrieval.
+    Optional progress_callback(step, max_steps, node_id) for reporting progress."""
+    job_id = job_input.get("job_id", f"local_{uuid.uuid4().hex[:8]}")
+    logger.info(f"=== Job {job_id} (v2) started ===")
+    task_id = f"task_{uuid.uuid4()}"
+
+    try:
+        workflow = job_input["workflow"]
+
+        # Write start image base64 to temp file
+        image_node_id = job_input.get("image_node_id", "244")
+        if "image_base64" in job_input:
+            image_path = save_base64_to_file(job_input["image_base64"], task_id, "input_image.jpg")
+            workflow[image_node_id]["inputs"]["image"] = image_path
+            logger.info(f"Start image written to {image_path}, patched into node {image_node_id}")
+
+        # Write end image base64 to temp file (FLF2V)
+        end_image_node_id = job_input.get("end_image_node_id", "617")
+        if "end_image_base64" in job_input:
+            end_image_path = save_base64_to_file(job_input["end_image_base64"], task_id, "end_image.jpg")
+            workflow[end_image_node_id]["inputs"]["image"] = end_image_path
+            logger.info(f"End image written to {end_image_path}, patched into node {end_image_node_id}")
+
+        # Download any requested models
+        model_downloads = job_input.get("model_downloads", [])
+        for dl in model_downloads:
+            download_model(dl["url"], dl["model_type"], dl.get("filename"))
+
+        # Connect to ComfyUI and submit
+        ws_url = f"ws://{server_address}:8188/ws?clientId={client_id}"
+        http_url = f"http://{server_address}:8188/"
+        logger.info(f"Checking HTTP connection to: {http_url}")
+        max_http_attempts = 180
+        for http_attempt in range(max_http_attempts):
+            try:
+                urllib.request.urlopen(http_url, timeout=5)
+                logger.info(f"HTTP connection successful (attempt {http_attempt+1})")
+                break
+            except Exception as e:
+                logger.warning(f"HTTP connection failed (attempt {http_attempt+1}/{max_http_attempts}): {e}")
+                if http_attempt == max_http_attempts - 1:
+                    raise Exception("Cannot connect to ComfyUI server. Please verify the server is running.")
+                time.sleep(1)
+
+        ws = websocket.WebSocket()
+        max_attempts = int(180 / 5)
+        for attempt in range(max_attempts):
+            try:
+                ws.connect(ws_url)
+                logger.info(f"WebSocket connection successful (attempt {attempt+1})")
+                break
+            except Exception as e:
+                logger.warning(f"WebSocket connection failed (attempt {attempt+1}/{max_attempts}): {e}")
+                if attempt == max_attempts - 1:
+                    raise Exception("WebSocket connection timed out (3 minutes)")
+                time.sleep(5)
+
+        videos = get_videos(ws, workflow, progress_callback=progress_callback)
+        ws.close()
+        logger.info("WebSocket closed")
+
+        for node_id in videos:
+            if videos[node_id]:
+                video_count = len(videos[node_id])
+                video_size = len(videos[node_id][0])
+                logger.info(f"=== Job {job_id} (v2) completed === Returning video from node {node_id} ({video_size} base64 chars, {video_count} total videos)")
+                return {"video": videos[node_id][0]}
+
+        node_summary = {nid: len(vids) for nid, vids in videos.items()}
+        logger.error(f"No videos found in any output node. Node summary: {node_summary}")
+        return {
+            "error": "No video found in ComfyUI output.",
+            "details": {"nodes_checked": list(videos.keys()), "node_video_counts": node_summary}
+        }
+
+    except Exception as e:
+        logger.error(f"=== Job {job_id} (v2) failed === {type(e).__name__}: {e}\n{traceback.format_exc()}")
+        return {"error": f"Job failed: {type(e).__name__}: {str(e)}"}
