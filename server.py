@@ -63,6 +63,10 @@ class JobStatusResponse(BaseModel):
     created_at: float
     started_at: Optional[float] = None
     completed_at: Optional[float] = None
+    progress: Optional[float] = None
+    progress_step: Optional[int] = None
+    progress_max: Optional[int] = None
+    current_node: Optional[str] = None
 
 
 def run_job(job_id: str, job_input: dict):
@@ -71,10 +75,17 @@ def run_job(job_id: str, job_input: dict):
         jobs[job_id]["status"] = "running"
         jobs[job_id]["started_at"] = time.time()
 
+    def on_progress(step, max_steps, node_id):
+        with jobs_lock:
+            jobs[job_id]["progress"] = round(step / max_steps * 100, 1)
+            jobs[job_id]["progress_step"] = int(step)
+            jobs[job_id]["progress_max"] = int(max_steps)
+            jobs[job_id]["current_node"] = node_id
+
     logger.info(f"Starting generation for job {job_id}")
 
     try:
-        result = handler(job_input)
+        result = handler(job_input, progress_callback=on_progress)
         with jobs_lock:
             if "error" in result:
                 jobs[job_id]["status"] = "failed"
@@ -105,6 +116,10 @@ def generate(request: GenerateRequest):
             "created_at": time.time(),
             "started_at": None,
             "completed_at": None,
+            "progress": None,
+            "progress_step": None,
+            "progress_max": None,
+            "current_node": None,
         }
 
     thread = threading.Thread(target=run_job, args=(job_id, job_input), daemon=True)

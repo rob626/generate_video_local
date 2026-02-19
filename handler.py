@@ -172,7 +172,7 @@ def get_image(filename, subfolder, folder_type):
         return response.read()
 
 
-def get_videos(ws, prompt):
+def get_videos(ws, prompt, progress_callback=None):
     logger.info("Starting video generation pipeline...")
 
     try:
@@ -242,6 +242,8 @@ def get_videos(ws, prompt):
             elif msg_type == 'progress':
                 value = msg_data.get('value', '?')
                 max_val = msg_data.get('max', '?')
+                if progress_callback and isinstance(value, (int, float)) and isinstance(max_val, (int, float)):
+                    progress_callback(value, max_val, current_node)
                 if message_count % 5 == 0:
                     logger.info(f"Progress: {value}/{max_val} (node: {current_node}, elapsed: {time.time() - start_time:.1f}s)")
             elif msg_type == 'execution_cached':
@@ -340,8 +342,9 @@ def load_workflow(workflow_path):
         raise
 
 
-def handler(job_input):
-    """Process a video generation job. Accepts a plain dict of input parameters."""
+def handler(job_input, progress_callback=None):
+    """Process a video generation job. Accepts a plain dict of input parameters.
+    Optional progress_callback(step, max_steps, node_id) for reporting progress."""
     job_id = job_input.get("job_id", f"local_{uuid.uuid4().hex[:8]}")
 
     logger.info(f"=== Job {job_id} started ===")
@@ -520,7 +523,7 @@ def handler(job_input):
                     raise Exception("WebSocket connection timed out (3 minutes)")
                 time.sleep(5)
 
-        videos = get_videos(ws, prompt)
+        videos = get_videos(ws, prompt, progress_callback=progress_callback)
         ws.close()
         logger.info("WebSocket closed")
 

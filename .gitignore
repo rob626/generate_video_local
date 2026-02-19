@@ -1,0 +1,14 @@
+# Local client scripts (contain personal URLs/config)
+run.py
+generate_video_client.py
+
+# Python
+__pycache__/
+*.pyc
+
+# Generated outputs
+*.mp4
+*.png
+
+# Environment
+.env
